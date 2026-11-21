@@ -1,3 +1,14 @@
+---
+title: Tolk Live
+emoji: 🗣️
+colorFrom: blue
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Live-Übersetzung DE/EN/UK für Gruppen
+---
+
 # Tolk Live
 
 Echtzeit-Sprachübersetzung für Gruppen: Deutsch, Englisch und Ukrainisch.
