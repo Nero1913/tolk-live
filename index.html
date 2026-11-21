@@ -406,7 +406,15 @@ $("typeForm").onsubmit=e=>{ e.preventDefault(); const v=$("typeInput").value.tri
 /* ---------- Vorlesen ---------- */
 const audio=new Audio(); let ttsQueue=[], playing=false;
 function unlockAudio(){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")) }catch(e){} audio.muted=true; audio.play().catch(()=>{}).finally(()=>{audio.muted=false}) }
-function voiceFor(l){ const vs=speechSynthesis.getVoices(); return vs.find(v=>v.lang.replace("_","-").toLowerCase()===LOCALE[l].toLowerCase()) || vs.find(v=>v.lang.toLowerCase().startsWith(l)) }
+/* Nur Standardsprache: de-DE, uk-UA, en-US/en-GB. Keine Dialekt- oder Spaßstimmen; sonst Google-Stimme (ebenfalls Standard). */
+const STD_LOCALES={de:["de-DE"],en:["en-US","en-GB"],uk:["uk-UA"]};
+const NOVELTY=/(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa|eddy|flo|reed|rocko|sandy|shelley)/i;
+function voiceFor(l){
+  const vs=window.speechSynthesis?speechSynthesis.getVoices():[];
+  const ok=vs.filter(v=>STD_LOCALES[l].includes(v.lang.replace("_","-")) && !NOVELTY.test(v.name));
+  const score=v=>(/premium|enhanced|natural|neural|online/i.test(v.name)?4:0)+(/google/i.test(v.name)?3:0)+(v.lang.replace("_","-")===STD_LOCALES[l][0]?2:0)+(v.localService?0:1);
+  return ok.sort((a,b)=>score(b)-score(a))[0];
+}
 function speakMsg(m,force){
   if(!force && !$("speakToggle").checked) return;
   const txt = m.lang===lang ? (force?m.text:null) : m.tr&&m.tr[lang];
