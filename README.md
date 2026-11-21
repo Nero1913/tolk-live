@@ -13,6 +13,8 @@ short_description: Live-Übersetzung DE/EN/UK für Gruppen
 
 # Tolk Live
 
+**Online:** https://nero1913.github.io/tolk-live/ – Link öffnen, Raum starten, Einladung teilen. Kein Konto, keine Installation.
+
 Echtzeit-Sprachübersetzung für Gruppen: Deutsch, Englisch und Ukrainisch.
 Jede Person spricht in ihrer eigenen Sprache. Alle anderen sehen den Text sofort übersetzt und hören ihn vorgelesen.
 
