@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tolk Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<meta name="referrer" content="no-referrer">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<style>
+/* Layout: one column app; a sticky top bar, a scrolling transcript, a docked mic console at the bottom. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#e9edf3; --line:#d5dbe4;
+  --fg:#16202e; --muted:#5d6878; --accent:#1f55c8; --accent-fg:#ffffff;
+  --live:#e3a008; --live-soft:#fdf3d8; --danger:#c0392b; --mine:#e4ecfb;
+  --font:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0e141d; --surface:#161e2a; --surface-2:#1f2a38; --line:#2b3748;
+  --fg:#e7ecf3; --muted:#93a0b3; --accent:#6f9bff; --accent-fg:#0b1220;
+  --live:#f4bb3a; --live-soft:#3a2f12; --danger:#ff7b6b; --mine:#1c2b47; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0e141d; --surface:#161e2a; --surface-2:#1f2a38; --line:#2b3748;
+  --fg:#e7ecf3; --muted:#93a0b3; --accent:#6f9bff; --accent-fg:#0b1220;
+  --live:#f4bb3a; --live-soft:#3a2f12; --danger:#ff7b6b; --mine:#1c2b47; color-scheme:dark }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2{text-wrap:balance;margin:0;line-height:1.15}
+.mono{font-family:var(--mono)}
+
+/* ---------- Start / Beitreten ---------- */
+.gate{min-height:100%;display:grid;place-items:center;padding-block:32px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;display:grid;gap:20px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:26px;height:26px}
+.live-word{color:var(--accent);font-weight:500}
+.brand h1{font-size:1.6rem;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+label.f{display:grid;gap:6px;font-weight:500;font-size:.9rem}
+input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
+.langs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lang{padding:12px 6px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);display:grid;gap:2px;justify-items:center;text-align:center}
+.lang b{font-weight:600;font-size:.95rem}
+.lang small{font-family:var(--mono);color:var(--muted);font-size:.72rem}
+.lang[aria-pressed="true"]{border-color:var(--accent);background:var(--mine)}
+.btn{border:0;border-radius:12px;padding:13px 18px;font-weight:600;background:var(--accent);color:var(--accent-fg)}
+.btn.ghost{background:var(--surface-2);color:var(--fg)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 auto}
+.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.err{color:var(--danger);font-size:.9rem;margin:0}
+
+/* ---------- Raum ---------- */
+.app{height:100%;display:grid;grid-template-rows:auto auto 1fr auto}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar .logo{width:34px;height:34px;border-radius:10px}
+.bar .logo svg{width:20px;height:20px}
+.room-id{display:grid;line-height:1.2;min-width:0}
+.room-id small{color:var(--muted);font-size:.75rem}
+.room-id b{font-family:var(--mono);letter-spacing:.08em}
+.bar .sp{flex:1}
+.bar select{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+.invite-btn{padding:9px 14px}
+.people{display:flex;gap:8px;overflow-x:auto;padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
+.person{flex:none;display:flex;align-items:center;gap:8px;padding:5px 12px 5px 5px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:.9rem}
+.av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:.75rem;font-weight:700;background:var(--surface-2)}
+.person .tag{font-family:var(--mono);font-size:.7rem;color:var(--muted);text-transform:uppercase}
+.person.talking{border-color:var(--live);background:var(--live-soft)}
+.feed{overflow-y:auto;padding-block:16px;display:flex;flex-direction:column;gap:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.feed-inner{width:100%;max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.empty{color:var(--muted);text-align:center;margin:auto;max-width:36ch;padding:24px}
+.msg{max-width:min(620px,88%);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;display:grid;gap:4px;min-width:0}
+.msg.mine{align-self:flex-end;background:var(--mine)}
+.msg .who{display:flex;gap:8px;align-items:baseline;font-size:.8rem;color:var(--muted)}
+.msg .who b{color:var(--fg);font-weight:600}
+.msg .main{font-size:1.08rem;overflow-wrap:anywhere}
+.msg .orig{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.msg .orig span{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;margin-right:6px}
+.msg .replay{justify-self:start;border:0;background:none;color:var(--accent);font-size:.8rem;padding:0;font-weight:600}
+.msg.interim{border-style:dashed;border-color:var(--live)}
+.msg.interim .main{color:var(--muted)}
+
+.console{background:var(--surface);border-top:1px solid var(--line);
+  padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.console-inner{max-width:760px;margin:0 auto;display:grid;gap:10px}
+.notice{font-size:.85rem;background:var(--live-soft);border-radius:10px;padding:8px 12px}
+.controls{display:flex;align-items:center;gap:10px}
+.mic{flex:none;width:64px;height:64px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;position:relative}
+.mic svg{width:28px;height:28px}
+.mic.on{background:var(--live);color:#1a1300}
+.mic.on::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--live);opacity:.6;animation:pulse 1.6s ease-out infinite}
+.mic.wait{background:var(--surface-2);color:var(--muted)}
+@keyframes pulse{from{transform:scale(.92);opacity:.7}to{transform:scale(1.18);opacity:0}}
+@media (prefers-reduced-motion:reduce){.mic.on::after{animation:none}}
+.status{flex:1;min-width:0;display:grid;line-height:1.3}
+.status b{font-size:.95rem}
+.status small{color:var(--muted);font-size:.8rem}
+.toggle{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.typebar{display:flex;gap:8px}
+.typebar input{flex:1;min-width:0}
+.typebar .btn{padding:10px 16px}
+
+/* ---------- Einladung ---------- */
+.sheet{position:fixed;inset:0;z-index:20;background:rgb(0 0 0 / .45);display:grid;place-items:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
+.sheet .card{max-height:100%;overflow:auto}
+.qr{justify-self:center;background:#fff;padding:10px;border-radius:12px;line-height:0}
+.qr svg{width:200px;height:200px;max-width:100%}
+.link{display:flex;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 12px}
+.link code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:.85rem}
+.link .btn{padding:8px 12px;flex:none}
+.share{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.share a,.share button{text-align:center;text-decoration:none;font-weight:600;font-size:.9rem;padding:11px;border-radius:12px;background:var(--surface-2);color:var(--fg);border:0}
+.codebig{text-align:center;font-family:var(--mono);font-size:2rem;letter-spacing:.2em}
+@media (max-width:480px){ .bar .room-id small{display:none} .invite-btn span{display:none} .toggle span{display:none} }
+</style>
+</head>
+<body>
+
+<!-- Start -->
+<section class="gate" id="home" hidden>
+  <div class="card">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--accent-fg)"><path d="M4 15c3-6 13-6 16 0"/><path d="M4 15v4M20 15v4M9 12v7M15 12v7"/></svg></div>
+      <h1>Tolk <span class="live-word">Live</span></h1>
+    </div>
+    <p class="sub" data-t="tagline"></p>
+    <div class="chips"><span class="chip">Deutsch</span><span class="chip">English</span><span class="chip">Українська</span></div>
+    <label class="f"><span data-t="yourName"></span><input type="text" id="homeName" autocomplete="name" maxlength="40"></label>
+    <div class="f" style="display:grid;gap:6px"><span style="font-weight:500;font-size:.9rem" data-t="iSpeak"></span><div class="langs" id="homeLangs"></div></div>
+    <button class="btn" id="createBtn" data-t="create"></button>
+    <div class="divider" data-t="or"></div>
+    <div class="row">
+      <input type="text" id="codeInput" class="mono" maxlength="7" style="text-transform:uppercase;letter-spacing:.15em" data-tp="code">
+      <button class="btn ghost" id="joinCodeBtn" style="flex:0 0 auto" data-t="join"></button>
+    </div>
+    <p class="err" id="homeErr" hidden></p>
+  </div>
+</section>
+
+<!-- Beitreten über Link -->
+<section class="gate" id="join" hidden>
+  <div class="card">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--accent-fg)"><path d="M4 15c3-6 13-6 16 0"/><path d="M4 15v4M20 15v4M9 12v7M15 12v7"/></svg></div>
+      <div><h1 data-t="invited"></h1><p class="sub"><span data-t="room"></span> <b class="mono" id="joinCode"></b></p></div>
+    </div>
+    <div class="f" style="display:grid;gap:6px"><span style="font-weight:500;font-size:.9rem" data-t="iSpeak"></span><div class="langs" id="joinLangs"></div></div>
+    <label class="f"><span data-t="yourName"></span><input type="text" id="joinName" autocomplete="name" maxlength="40"></label>
+    <button class="btn" id="enterBtn" data-t="enter"></button>
+  </div>
+</section>
+
+<!-- Raum -->
+<section class="app" id="room" hidden>
+  <header class="bar">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--accent-fg)"><path d="M4 15c3-6 13-6 16 0"/><path d="M4 15v4M20 15v4M9 12v7M15 12v7"/></svg></div>
+    <div class="room-id"><small data-t="room"></small><b id="roomCode"></b></div>
+    <div class="sp"></div>
+    <select id="langSelect" aria-label="Language"></select>
+    <button class="btn invite-btn" id="inviteBtn">+ <span data-t="invite"></span></button>
+  </header>
+  <div class="people" id="people" aria-label="Participants"></div>
+  <main class="feed" id="feed"><div class="feed-inner" id="feedInner"><p class="empty" id="empty" data-t="empty"></p></div></main>
+  <footer class="console">
+    <div class="console-inner">
+      <div class="notice" id="notice" hidden></div>
+      <div class="controls">
+        <button class="mic" id="micBtn" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <div class="status"><b id="statusMain"></b><small id="statusSub"></small></div>
+        <label class="toggle"><input type="checkbox" id="speakToggle" checked><span data-t="readAloud"></span></label>
+      </div>
+      <form class="typebar" id="typeForm">
+        <input type="text" id="typeInput" autocomplete="off" data-tp="typeHere">
+        <button class="btn ghost" data-t="send"></button>
+      </form>
+    </div>
+  </footer>
+</section>
+
+<!-- Einladen -->
+<div class="sheet" id="sheet" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h2 id="sheetTitle" data-t="inviteTitle"></h2>
+    <p class="sub" data-t="inviteHint"></p>
+    <div class="qr" id="qr"></div>
+    <div class="codebig" id="sheetCode"></div>
+    <div class="link"><code id="inviteLink"></code><button class="btn" id="copyBtn" data-t="copy"></button></div>
+    <div class="share" id="shareRow">
+      <button id="nativeShare" hidden data-t="share"></button>
+      <a id="waShare" target="_blank" rel="noopener">WhatsApp</a>
+      <a id="tgShare" target="_blank" rel="noopener">Telegram</a>
+      <a id="mailShare">E-Mail</a>
+    </div>
+    <button class="btn ghost" id="closeSheet" data-t="close"></button>
+  </div>
+</div>
+
+<script>
+const T = {
+  de:{tagline:"Sprecht in eurer eigenen Sprache. Alle anderen hören und lesen sofort die Übersetzung.",yourName:"Dein Name",iSpeak:"Ich spreche",create:"Neuen Raum starten",or:"oder mit Code beitreten",code:"CODE",join:"Beitreten",invited:"Du wurdest eingeladen",room:"Raum",enter:"Gespräch beitreten",invite:"Einladen",empty:"Noch ist es still. Tippe auf das Mikrofon und sprich – oder lade zuerst jemanden ein.",readAloud:"Vorlesen",typeHere:"Oder hier tippen …",send:"Senden",inviteTitle:"Leute einladen",inviteHint:"QR-Code scannen oder Link schicken. Name und Sprache wählen, fertig.",copy:"Kopieren",copied:"Kopiert",share:"Teilen …",close:"Schließen",micOff:"Mikrofon aus",micOffSub:"Tippe zum Sprechen",micOn:"Ich höre zu …",micOnSub:"Sprich ganz normal, Pausen beenden einen Satz",micWait:"Übersetzung wird vorgelesen",micWaitSub:"Mikrofon pausiert, damit es kein Echo gibt",noSR:"Dieser Browser kann keine Sprache erkennen. Nutze Chrome, Edge oder Safari – tippen geht trotzdem.",insecure:"Das Mikrofon braucht eine sichere Verbindung (https). Über diesen Link kannst du nur tippen.",denied:"Mikrofon blockiert. Erlaube den Zugriff in den Browser-Einstellungen.",roomGone:"Diesen Raum gibt es nicht. Prüfe den Code.",nameMissing:"Bitte gib deinen Namen ein.",you:"du",connecting:"Verbinde mit dem Raum …",offline:"Verbindung unterbrochen, verbinde neu …",inviteText:"Komm in mein Gespräch mit Live-Übersetzung",replay:"Nochmal hören",trFail:"Übersetzung nicht verfügbar"},
+  en:{tagline:"Everyone speaks their own language. Everyone else hears and reads the translation right away.",yourName:"Your name",iSpeak:"I speak",create:"Start a new room",or:"or join with a code",code:"CODE",join:"Join",invited:"You're invited",room:"Room",enter:"Join the conversation",invite:"Invite",empty:"It's quiet so far. Tap the microphone and talk, or invite someone first.",readAloud:"Read aloud",typeHere:"Or type here …",send:"Send",inviteTitle:"Invite people",inviteHint:"Scan the QR code or send the link. Pick a name and language, done.",copy:"Copy",copied:"Copied",share:"Share …",close:"Close",micOff:"Microphone off",micOffSub:"Tap to speak",micOn:"Listening …",micOnSub:"Speak normally, a pause ends a sentence",micWait:"Reading translation aloud",micWaitSub:"Microphone paused to avoid echo",noSR:"This browser can't recognise speech. Use Chrome, Edge or Safari. Typing still works.",insecure:"The microphone needs a secure (https) connection. With this link you can only type.",denied:"Microphone blocked. Allow access in your browser settings.",roomGone:"That room doesn't exist. Check the code.",nameMissing:"Please enter your name.",you:"you",connecting:"Connecting to the room …",offline:"Connection lost, reconnecting …",inviteText:"Join my conversation with live translation",replay:"Play again",trFail:"Translation unavailable"},
+  uk:{tagline:"Кожен говорить своєю мовою. Інші одразу чують і читають переклад.",yourName:"Ваше ім'я",iSpeak:"Я розмовляю",create:"Створити нову кімнату",or:"або приєднатися за кодом",code:"КОД",join:"Увійти",invited:"Вас запросили",room:"Кімната",enter:"Приєднатися до розмови",invite:"Запросити",empty:"Поки що тихо. Натисніть мікрофон і говоріть або спершу запросіть когось.",readAloud:"Озвучувати",typeHere:"Або напишіть тут …",send:"Надіслати",inviteTitle:"Запросити людей",inviteHint:"Скануйте QR-код або надішліть посилання. Оберіть ім'я та мову, і все.",copy:"Копіювати",copied:"Скопійовано",share:"Поділитися …",close:"Закрити",micOff:"Мікрофон вимкнено",micOffSub:"Натисніть, щоб говорити",micOn:"Слухаю …",micOnSub:"Говоріть звичайно, пауза завершує речення",micWait:"Озвучується переклад",micWaitSub:"Мікрофон на паузі, щоб не було відлуння",noSR:"Цей браузер не розпізнає мовлення. Використовуйте Chrome, Edge або Safari. Писати можна.",insecure:"Мікрофону потрібне захищене з'єднання (https). За цим посиланням можна лише писати.",denied:"Мікрофон заблоковано. Дозвольте доступ у налаштуваннях браузера.",roomGone:"Такої кімнати немає. Перевірте код.",nameMissing:"Будь ласка, введіть ім'я.",you:"ви",connecting:"Підключаюся до кімнати …",offline:"З'єднання втрачено, підключаюся …",inviteText:"Приєднуйся до моєї розмови з живим перекладом",replay:"Прослухати ще раз",trFail:"Переклад недоступний"}
+};
+const LANGS = [["de","Deutsch","DE"],["en","English","EN"],["uk","Українська","UK"]];
+const LOCALE = {de:"de-DE",en:"en-US",uk:"uk-UA"};
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const $ = id => document.getElementById(id);
+
+const guess = (navigator.language||"en").slice(0,2);
+let lang = store.get("sb_lang") || (["de","en","uk"].includes(guess)?guess:"en");
+let name = store.get("sb_name") || "";
+let roomCode = null, messages = new Map(), roster = new Map();
+const rid = () => Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
+let pid = (()=>{ try{ return sessionStorage.getItem("tl_pid") || (sessionStorage.setItem("tl_pid", rid()), sessionStorage.getItem("tl_pid")) }catch(e){ return rid() } })();
+const t = k => (T[lang]&&T[lang][k]) || T.en[k] || k;
+
+function applyI18n(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(el=>el.textContent=t(el.dataset.t));
+  document.querySelectorAll("[data-tp]").forEach(el=>el.placeholder=t(el.dataset.tp));
+  renderLangButtons(); updateStatus(); renderRoster(); rerenderFeed(); updateConn();
+}
+function renderLangButtons(){
+  for (const id of ["homeLangs","joinLangs"]){
+    const box=$(id); box.innerHTML="";
+    for (const [c,label,short] of LANGS){
+      const b=document.createElement("button"); b.type="button"; b.className="lang";
+      b.setAttribute("aria-pressed", c===lang);
+      b.innerHTML=`<b></b><small>${short}</small>`; b.firstChild.textContent=label;
+      b.onclick=()=>{lang=c;store.set("sb_lang",c);applyI18n()};
+      box.appendChild(b);
+    }
+  }
+  const sel=$("langSelect"); sel.innerHTML="";
+  for (const [c,label] of LANGS){const o=new Option(label,c); o.selected=c===lang; sel.add(o)}
+}
+
+/* ---------- Navigation ---------- */
+const CODE_ALPHABET="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function newCode(){ const a=crypto.getRandomValues(new Uint8Array(7)); return [...a].map(x=>CODE_ALPHABET[x%32]).join("") }
+function cleanCode(s){ return (s||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12) }
+function show(id){ for(const s of ["home","join","room"]) $(s).hidden = s!==id }
+function route(){
+  const c = cleanCode(new URLSearchParams(location.search).get("r"));
+  if (c.length>=5){ roomCode=c; $("joinCode").textContent=roomCode; $("joinName").value=name; show("join") }
+  else { $("homeName").value=name; show("home") }
+}
+function takeName(input){
+  const v=$(input).value.trim();
+  if(!v){ $(input).focus(); $(input).placeholder=t("nameMissing"); return null }
+  name=v; store.set("sb_name",v); return v;
+}
+function goRoom(code, openInvite){ roomCode=code; history.pushState(null,"","?r="+code); enterRoom(openInvite) }
+$("createBtn").onclick = ()=>{ if(!takeName("homeName")) return; unlockAudio(); goRoom(newCode(), true) };
+$("joinCodeBtn").onclick = ()=>{
+  const code=cleanCode($("codeInput").value);
+  if(code.length<5) return $("codeInput").focus();
+  if(!takeName("homeName")) return;
+  unlockAudio(); goRoom(code, false);
+};
+$("codeInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("joinCodeBtn").click()});
+$("enterBtn").onclick = ()=>{ if(!takeName("joinName")) return; unlockAudio(); enterRoom(false) };
+$("joinName").addEventListener("keydown",e=>{if(e.key==="Enter")$("enterBtn").click()});
+window.addEventListener("popstate", ()=>location.reload());
+
+/* ---------- Verschlüsselte Verbindung über öffentliche MQTT-Relais ----------
+   Raumcode -> Kanalname (Hash) und AES-Schlüssel (PBKDF2). Die Relais sehen nur verschlüsselte Daten.
+   Es wird parallel über zwei Relais gesendet; doppelte Pakete werden verworfen. */
+const BROKERS=["wss://broker.emqx.io:8084/mqtt","wss://broker.hivemq.com:8884/mqtt"];
+let clients=[], topic=null, cryptoKey=null, everConnected=false, askedHistory=false;
+const seen=new Set(), seenQ=[];
+const enc=new TextEncoder(), dec=new TextDecoder();
+async function deriveRoom(code){
+  const h=new Uint8Array(await crypto.subtle.digest("SHA-256",enc.encode("tolk-live-topic:"+code)));
+  topic="tolklive/v1/"+[...h.slice(0,12)].map(b=>b.toString(16).padStart(2,"0")).join("");
+  const base=await crypto.subtle.importKey("raw",enc.encode(code),"PBKDF2",false,["deriveKey"]);
+  cryptoKey=await crypto.subtle.deriveKey({name:"PBKDF2",salt:enc.encode("tolk-live-v1"),iterations:150000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+async function seal(obj){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},cryptoKey,enc.encode(JSON.stringify(obj))));
+  const out=new Uint8Array(12+ct.length); out.set(iv); out.set(ct,12); return out;
+}
+async function unseal(buf){
+  const u=new Uint8Array(buf);
+  return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:u.slice(0,12)},cryptoKey,u.slice(12))));
+}
+function remember(n){ seen.add(n); seenQ.push(n); if(seenQ.length>800) seen.delete(seenQ.shift()) }
+async function send(obj){
+  if(!cryptoKey) return;
+  Object.assign(obj,{n:rid(),pid,name,lang,ts:Date.now()}); remember(obj.n);
+  const b=await seal(obj);
+  for(const c of clients) if(c.connected) c.publish(topic,b);
+}
+async function enterRoom(openInvite){
+  show("room"); $("roomCode").textContent=roomCode; document.title="Tolk Live · "+roomCode;
+  checkMicSupport(); updateStatus(); renderRoster();
+  if(openInvite) openSheet();
+  await deriveRoom(roomCode);
+  connect();
+}
+function connect(){
+  if(!window.mqtt){ setNotice(t("offline")); return }
+  for(const url of BROKERS){
+    const c=mqtt.connect(url,{clientId:"tl_"+rid(),reconnectPeriod:3000,connectTimeout:8000,keepalive:30,clean:true});
+    c.on("connect",()=>{ c.subscribe(topic,{qos:0}); everConnected=true; updateConn(); sendHello() });
+    c.on("close",updateConn); c.on("offline",updateConn);
+    c.on("message",(tp,buf)=>{ unseal(buf).then(onPacket).catch(()=>{}) });
+    clients.push(c);
+  }
+  setInterval(()=>sendHello(),10000);
+  setInterval(pruneRoster,5000);
+}
+let helloTimer=null;
+function sendHello(){ clearTimeout(helloTimer); helloTimer=setTimeout(()=>{ send({t:"hello",want:!askedHistory}); askedHistory=true },150) }
+function updateConn(){
+  if(!$("room")||$("room").hidden) return;
+  const ok=clients.some(c=>c.connected);
+  setNotice(ok ? noticeText : (everConnected ? t("offline") : t("connecting")));
+}
+const histTimers={};
+function onPacket(p){
+  if(!p||!p.n||seen.has(p.n)) return; remember(p.n);
+  if(p.pid===pid) return;
+  if(p.t==="bye"){ roster.delete(p.pid); interim.delete(p.pid); renderInterim(); return }
+  roster.set(p.pid,{name:String(p.name||"?").slice(0,40),lang:LOCALE[p.lang]?p.lang:"en",seen:Date.now()});
+  if(p.t==="hello"){
+    if(p.want && messages.size && !histTimers[p.pid]) histTimers[p.pid]=setTimeout(()=>send({t:"hist",to:p.pid,msgs:[...messages.values()].slice(-40)}),300+Math.random()*900);
+  } else if(p.t==="hist"){
+    clearTimeout(histTimers[p.to]);
+    if(p.to===pid && Array.isArray(p.msgs)){ for(const m of p.msgs) if(m&&m.id&&!messages.has(m.id)) messages.set(m.id,m); sortMessages(); rerenderFeed() }
+  } else if(p.t==="msg"){
+    const m={id:p.id,pid:p.pid,name:p.name,lang:p.lang,text:String(p.text||"").slice(0,1000),tr:p.tr||{},ts:p.ts};
+    if(messages.has(m.id)) return;
+    messages.set(m.id,m); interim.delete(p.pid); rerenderFeed(); speakMsg(m);
+  } else if(p.t==="interim"){
+    if(p.text) interim.set(p.pid,{name:p.name,lang:p.lang,text:String(p.text).slice(0,500)}); else interim.delete(p.pid);
+    renderInterim(); return;
+  }
+  renderRoster();
+}
+function sortMessages(){ messages=new Map([...messages.entries()].sort((a,b)=>a[1].ts-b[1].ts)) }
+function pruneRoster(){ const now=Date.now(); let ch=false; for(const [k,v] of roster) if(now-v.seen>32000){ roster.delete(k); interim.delete(k); ch=true } if(ch){ renderRoster(); renderInterim() } }
+window.addEventListener("pagehide",()=>{ if(cryptoKey) send({t:"bye"}) });
+
+/* ---------- Übersetzung (im Browser, Google) ---------- */
+const trCache=new Map();
+async function translate(text,src,dst){
+  if(src===dst) return text;
+  const k=src+">"+dst+":"+text; if(trCache.has(k)) return trCache.get(k);
+  try{
+    const r=await fetch("https://translate.googleapis.com/translate_a/single?"+new URLSearchParams({client:"gtx",sl:src,tl:dst,dt:"t",q:text}));
+    if(!r.ok) return null;
+    const out=(await r.json())[0].map(s=>s&&s[0]||"").join("");
+    trCache.set(k,out); return out;
+  }catch(e){ return null }
+}
+async function say(text){
+  text=text.trim().slice(0,1000); if(!text) return;
+  const m={id:rid(),pid,name,lang,text,tr:{[lang]:text},ts:Date.now()};
+  messages.set(m.id,m); rerenderFeed();
+  await Promise.all(LANGS.map(([l])=>l===lang?null:translate(text,lang,l).then(x=>{ if(x) m.tr[l]=x })));
+  send({t:"msg",id:m.id,text:m.text,tr:m.tr});
+}
+const pendingTr=new Set();
+function ensureTr(m){
+  const key=m.id+lang; if(pendingTr.has(key)) return; pendingTr.add(key);
+  translate(m.text,m.lang,lang).then(x=>{ if(x){ m.tr[lang]=x; rerenderFeed() } });
+}
+$("langSelect").onchange=e=>{ lang=e.target.value; store.set("sb_lang",lang); sendHello(); applyI18n(); if(micOn){ stopRec(); startRec() } };
+
+/* ---------- Teilnehmer ---------- */
+function renderRoster(){
+  const box=$("people"); if(!box) return; box.innerHTML="";
+  const list=[[pid,{name,lang}],...roster.entries()];
+  for(const [id,p] of list){
+    const el=document.createElement("div"); el.className="person"+(interim.has(id)?" talking":"");
+    const initials=(p.name||"?").trim().split(/\s+/).map(s=>s[0]).join("").slice(0,2).toUpperCase();
+    el.innerHTML=`<span class="av"></span><span class="nm"></span><span class="tag"></span>`;
+    el.querySelector(".av").textContent=initials;
+    el.querySelector(".nm").textContent=p.name+(id===pid?` (${t("you")})`:"");
+    el.querySelector(".tag").textContent=p.lang;
+    box.appendChild(el);
+  }
+}
+
+/* ---------- Verlauf ---------- */
+const interim=new Map();
+function msgEl(m){
+  const mine=m.pid===pid, el=document.createElement("article");
+  el.className="msg"+(mine?" mine":"");
+  const shown = m.lang===lang ? m.text : (m.tr&&m.tr[lang]);
+  if(!shown) ensureTr(m);
+  const time=new Date(m.ts).toLocaleTimeString(LOCALE[lang],{hour:"2-digit",minute:"2-digit"});
+  el.innerHTML=`<div class="who"><b></b><span></span></div><div class="main"></div>`;
+  el.querySelector(".who b").textContent=mine?`${m.name} (${t("you")})`:m.name;
+  el.querySelector(".who span").textContent=time;
+  el.querySelector(".main").textContent=shown||m.text;
+  if(m.lang!==lang){
+    const o=document.createElement("div"); o.className="orig";
+    o.innerHTML=`<span></span>`; o.firstChild.textContent=m.lang; o.append(document.createTextNode(m.text));
+    el.appendChild(o);
+    if(!mine && shown){ const b=document.createElement("button"); b.className="replay"; b.textContent="▶ "+t("replay"); b.onclick=()=>speakMsg(m,true); el.appendChild(b) }
+  }
+  return el;
+}
+function rerenderFeed(){
+  const inner=$("feedInner"); if(!inner) return;
+  inner.querySelectorAll(".msg").forEach(n=>n.remove());
+  $("empty").hidden=messages.size>0;
+  for(const m of messages.values()) inner.appendChild(msgEl(m));
+  renderInterim();
+}
+function renderInterim(){
+  const inner=$("feedInner"); inner.querySelectorAll(".msg.interim").forEach(n=>n.remove());
+  for(const d of interim.values()){
+    const el=document.createElement("article"); el.className="msg interim";
+    el.innerHTML=`<div class="who"><b></b><span></span></div><div class="main"></div>`;
+    el.querySelector(".who b").textContent=d.name; el.querySelector(".who span").textContent=String(d.lang).toUpperCase()+" …";
+    el.querySelector(".main").textContent=d.text; inner.appendChild(el);
+  }
+  if(interim.size) $("empty").hidden=true;
+  renderRoster();
+  const f=$("feed"); f.scrollTop=f.scrollHeight;
+}
+
+/* ---------- Spracherkennung ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, micOn=false, speaking=false, noticeText="";
+function setNotice(txt){ $("notice").textContent=txt; $("notice").hidden=!txt }
+function checkMicSupport(){
+  if(!window.isSecureContext) noticeText=t("insecure");
+  else if(!SR) noticeText=t("noSR");
+  setNotice(noticeText);
+  $("micBtn").disabled = !SR || !window.isSecureContext;
+}
+function updateStatus(){
+  if(!$("micBtn")) return;
+  const b=$("micBtn"); b.classList.toggle("on",micOn&&!speaking); b.classList.toggle("wait",micOn&&speaking);
+  b.setAttribute("aria-pressed",micOn);
+  const [a,s]= !micOn?["micOff","micOffSub"]: speaking?["micWait","micWaitSub"]:["micOn","micOnSub"];
+  $("statusMain").textContent=t(a); $("statusSub").textContent=t(s);
+}
+let lastInterim=0;
+function startRec(){
+  if(!SR||!micOn||speaking||rec) return;
+  rec=new SR(); rec.lang=LOCALE[lang]; rec.continuous=true; rec.interimResults=true;
+  rec.onresult=e=>{
+    let partial="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal){ const txt=r[0].transcript.trim(); if(txt){ say(txt); send({t:"interim",text:""}) } }
+      else partial+=r[0].transcript;
+    }
+    const now=Date.now();
+    if(partial && now-lastInterim>400){ lastInterim=now; send({t:"interim",text:partial}) }
+  };
+  rec.onerror=e=>{ if(e.error==="not-allowed"||e.error==="service-not-allowed"){ micOn=false; setNotice(t("denied")); updateStatus() } };
+  rec.onend=()=>{ rec=null; if(micOn&&!speaking) setTimeout(startRec,200) };
+  try{ rec.start() }catch(e){ rec=null }
+}
+function stopRec(){ if(rec){ const r=rec; rec=null; r.onend=null; try{r.abort()}catch(e){} } }
+$("micBtn").onclick=()=>{ micOn=!micOn; unlockAudio(); if(micOn) startRec(); else { stopRec(); send({t:"interim",text:""}) } updateStatus() };
+$("typeForm").onsubmit=e=>{ e.preventDefault(); const v=$("typeInput").value.trim(); if(!v) return; say(v); $("typeInput").value="" };
+
+/* ---------- Vorlesen ---------- */
+const audio=new Audio(); let ttsQueue=[], playing=false;
+function unlockAudio(){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")) }catch(e){} audio.muted=true; audio.play().catch(()=>{}).finally(()=>{audio.muted=false}) }
+function voiceFor(l){ const vs=window.speechSynthesis?speechSynthesis.getVoices():[]; return vs.find(v=>v.lang.replace("_","-").toLowerCase()===LOCALE[l].toLowerCase()) || vs.find(v=>v.lang.toLowerCase().startsWith(l)) }
+function speakMsg(m,force){
+  if(!force && !$("speakToggle").checked) return;
+  const txt = m.lang===lang ? (force?m.text:null) : m.tr&&m.tr[lang];
+  if(txt){ ttsQueue.push({text:txt,lang}); if(!playing) playNext(); return }
+  if(m.lang!==lang) translate(m.text,m.lang,lang).then(x=>{ if(x){ m.tr[lang]=x; rerenderFeed(); ttsQueue.push({text:x,lang}); if(!playing) playNext() } });
+}
+function chunks(s){ const out=[]; for(const part of s.match(/[^.!?…]+[.!?…]*/g)||[s]){ let p=part.trim(); while(p.length>190){ let i=p.lastIndexOf(" ",190); if(i<1) i=190; out.push(p.slice(0,i)); p=p.slice(i).trim() } if(p) out.push(p) } return out }
+async function playNext(){
+  const item=ttsQueue.shift();
+  if(!item){ playing=false; speaking=false; updateStatus(); if(micOn) setTimeout(startRec,300); return }
+  playing=true; speaking=true; stopRec(); updateStatus();
+  const v=voiceFor(item.lang);
+  try{
+    if(v){
+      await new Promise(res=>{ const u=new SpeechSynthesisUtterance(item.text); u.voice=v; u.lang=v.lang; u.rate=1.05; u.onend=res; u.onerror=res; speechSynthesis.speak(u) });
+    } else {
+      for(const c of chunks(item.text)){
+        await new Promise(res=>{ audio.src="https://translate.google.com/translate_tts?"+new URLSearchParams({ie:"UTF-8",tl:item.lang,client:"tw-ob",q:c}); audio.onended=res; audio.onerror=res; audio.play().catch(res) });
+      }
+    }
+  }catch(e){}
+  playNext();
+}
+if(window.speechSynthesis) speechSynthesis.onvoiceschanged=()=>{};
+
+/* ---------- Einladung ---------- */
+function inviteUrl(){ return location.origin+location.pathname+"?r="+roomCode }
+function openSheet(){
+  const url=inviteUrl(), msg=`${T.de.inviteText} / ${T.en.inviteText} / ${T.uk.inviteText}: ${url}`;
+  $("inviteLink").textContent=url; $("sheetCode").textContent=roomCode;
+  $("waShare").href="https://wa.me/?text="+encodeURIComponent(msg);
+  $("tgShare").href="https://t.me/share/url?"+new URLSearchParams({url,text:T.de.inviteText+" / "+T.uk.inviteText});
+  $("mailShare").href="mailto:?"+new URLSearchParams({subject:"Tolk Live",body:msg}).toString().replace(/\+/g,"%20");
+  $("nativeShare").hidden=!navigator.share;
+  $("nativeShare").onclick=()=>navigator.share({title:"Tolk Live",text:msg,url}).catch(()=>{});
+  const q=$("qr"); q.innerHTML="";
+  if(window.qrcode){ const qr=qrcode(0,"M"); qr.addData(url); qr.make(); q.innerHTML=qr.createSvgTag({cellSize:6,margin:0,scalable:true}) } else q.hidden=true;
+  $("copyBtn").textContent=t("copy");
+  $("sheet").hidden=false;
+}
+$("inviteBtn").onclick=openSheet;
+$("closeSheet").onclick=()=>$("sheet").hidden=true;
+$("sheet").onclick=e=>{ if(e.target.id==="sheet") $("sheet").hidden=true };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("sheet").hidden=true });
+$("copyBtn").onclick=async()=>{
+  try{ await navigator.clipboard.writeText(inviteUrl()); $("copyBtn").textContent=t("copied") }
+  catch(e){ const r=document.createRange(); r.selectNodeContents($("inviteLink")); const s=getSelection(); s.removeAllRanges(); s.addRange(r) }
+};
+
+applyI18n(); route();
+if(!$("room").hidden) enterRoom(false);
+</script>
+</body>
+</html>
