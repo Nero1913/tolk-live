@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tolk-live
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: python3 --version
+    startCommand: python3 server.py
+    healthCheckPath: /
+    envVars:
+      - key: DEEPL_API_KEY
+        sync: false   # wird beim Einrichten in Render abgefragt, landet nie im Code

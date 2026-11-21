@@ -1,0 +1,6 @@
+deepl_key.txt
+.kein_deepl
+link.txt
+bin/
+__pycache__/
+.DS_Store
