@@ -4,3 +4,4 @@ link.txt
 bin/
 __pycache__/
 .DS_Store
+.hf_user
