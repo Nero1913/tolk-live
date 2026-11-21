@@ -347,7 +347,9 @@ function onPacket(p){
   if(!p||!p.n||seen.has(p.n)) return; remember(p.n);
   if(p.pid===pid) return;
   if(p.t==="bye"){ roster.delete(p.pid); interim.delete(p.pid); renderInterim(); return }
+  const isNew=!roster.has(p.pid);
   roster.set(p.pid,{name:String(p.name||"?").slice(0,40),lang:LOCALE[p.lang]?p.lang:"en",seen:Date.now()});
+  if(isNew && p.t==="hello") sendHello();   // Neuankömmlinge sehen uns sofort, nicht erst nach 10 s
   if(p.t==="hello"){
     if(p.want && messages.size && !histTimers[p.pid]) histTimers[p.pid]=setTimeout(()=>send({t:"hist",to:p.pid,msgs:[...messages.values()].slice(-40)}),300+Math.random()*900);
   } else if(p.t==="hist"){
