@@ -3,8 +3,10 @@ title: Tolk Live
 emoji: 🗣️
 colorFrom: blue
 colorTo: yellow
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: 5.9.1
+app_file: app.py
+python_version: "3.12"
 pinned: false
 short_description: Live-Übersetzung DE/EN/UK für Gruppen
 ---
