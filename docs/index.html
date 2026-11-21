@@ -118,6 +118,10 @@ input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px soli
 .toggle{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);white-space:nowrap}
 .toggle input{width:18px;height:18px;accent-color:var(--accent)}
 .typebar{display:flex;gap:8px}
+.voice-btn{flex:none;padding:9px 12px;display:flex;align-items:center;gap:6px;font-size:.85rem}
+.voice-btn svg{width:18px;height:18px}
+.card select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
+@media (max-width:480px){ .voice-btn span{display:none} }
 .typebar input{flex:1;min-width:0}
 .typebar .btn{padding:10px 16px}
 
@@ -192,6 +196,7 @@ input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px soli
         </button>
         <div class="status"><b id="statusMain"></b><small id="statusSub"></small></div>
         <label class="toggle"><input type="checkbox" id="speakToggle" checked><span data-t="readAloud"></span></label>
+        <button class="btn ghost voice-btn" id="voiceBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span data-t="voice"></span></button>
       </div>
       <form class="typebar" id="typeForm">
         <input type="text" id="typeInput" autocomplete="off" data-tp="typeHere">
@@ -200,6 +205,20 @@ input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px soli
     </div>
   </footer>
 </section>
+
+<!-- Vorlese-Stimme -->
+<div class="sheet" id="voiceSheet" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="voiceTitle">
+    <h2 id="voiceTitle" data-t="voiceTitle"></h2>
+    <p class="sub" id="voiceHint"></p>
+    <label class="f"><span data-t="voiceLabel"></span><select id="voiceSelect"></select></label>
+    <label class="f"><span data-t="pitchLabel"></span><select id="pitchSelect"></select></label>
+    <div class="row">
+      <button class="btn ghost" id="voiceTest" type="button" data-t="voiceTest"></button>
+      <button class="btn" id="voiceDone" type="button" data-t="close"></button>
+    </div>
+  </div>
+</div>
 
 <!-- Einladen -->
 <div class="sheet" id="sheet" hidden>
@@ -221,9 +240,9 @@ input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px soli
 
 <script>
 const T = {
-  de:{tagline:"Sprecht in eurer eigenen Sprache. Alle anderen hören und lesen sofort die Übersetzung.",yourName:"Dein Name",iSpeak:"Ich spreche",create:"Neuen Raum starten",or:"oder mit Code beitreten",code:"CODE",join:"Beitreten",invited:"Du wurdest eingeladen",room:"Raum",enter:"Gespräch beitreten",invite:"Einladen",empty:"Noch ist es still. Tippe auf das Mikrofon und sprich – oder lade zuerst jemanden ein.",readAloud:"Vorlesen",typeHere:"Oder hier tippen …",send:"Senden",inviteTitle:"Leute einladen",inviteHint:"QR-Code scannen oder Link schicken. Name und Sprache wählen, fertig.",copy:"Kopieren",copied:"Kopiert",share:"Teilen …",close:"Schließen",micOff:"Mikrofon aus",micOffSub:"Tippe zum Sprechen",micOn:"Ich höre zu …",micOnSub:"Sprich ganz normal, Pausen beenden einen Satz",micWait:"Übersetzung wird vorgelesen",micWaitSub:"Mikrofon pausiert, damit es kein Echo gibt",noSR:"Dieser Browser kann keine Sprache erkennen. Nutze Chrome, Edge oder Safari – tippen geht trotzdem.",insecure:"Das Mikrofon braucht eine sichere Verbindung (https). Über diesen Link kannst du nur tippen.",denied:"Mikrofon blockiert. Erlaube den Zugriff in den Browser-Einstellungen.",roomGone:"Diesen Raum gibt es nicht. Prüfe den Code.",nameMissing:"Bitte gib deinen Namen ein.",you:"du",connecting:"Verbinde mit dem Raum …",offline:"Verbindung unterbrochen, verbinde neu …",inviteText:"Komm in mein Gespräch mit Live-Übersetzung",replay:"Nochmal hören",trFail:"Übersetzung nicht verfügbar"},
-  en:{tagline:"Everyone speaks their own language. Everyone else hears and reads the translation right away.",yourName:"Your name",iSpeak:"I speak",create:"Start a new room",or:"or join with a code",code:"CODE",join:"Join",invited:"You're invited",room:"Room",enter:"Join the conversation",invite:"Invite",empty:"It's quiet so far. Tap the microphone and talk, or invite someone first.",readAloud:"Read aloud",typeHere:"Or type here …",send:"Send",inviteTitle:"Invite people",inviteHint:"Scan the QR code or send the link. Pick a name and language, done.",copy:"Copy",copied:"Copied",share:"Share …",close:"Close",micOff:"Microphone off",micOffSub:"Tap to speak",micOn:"Listening …",micOnSub:"Speak normally, a pause ends a sentence",micWait:"Reading translation aloud",micWaitSub:"Microphone paused to avoid echo",noSR:"This browser can't recognise speech. Use Chrome, Edge or Safari. Typing still works.",insecure:"The microphone needs a secure (https) connection. With this link you can only type.",denied:"Microphone blocked. Allow access in your browser settings.",roomGone:"That room doesn't exist. Check the code.",nameMissing:"Please enter your name.",you:"you",connecting:"Connecting to the room …",offline:"Connection lost, reconnecting …",inviteText:"Join my conversation with live translation",replay:"Play again",trFail:"Translation unavailable"},
-  uk:{tagline:"Кожен говорить своєю мовою. Інші одразу чують і читають переклад.",yourName:"Ваше ім'я",iSpeak:"Я розмовляю",create:"Створити нову кімнату",or:"або приєднатися за кодом",code:"КОД",join:"Увійти",invited:"Вас запросили",room:"Кімната",enter:"Приєднатися до розмови",invite:"Запросити",empty:"Поки що тихо. Натисніть мікрофон і говоріть або спершу запросіть когось.",readAloud:"Озвучувати",typeHere:"Або напишіть тут …",send:"Надіслати",inviteTitle:"Запросити людей",inviteHint:"Скануйте QR-код або надішліть посилання. Оберіть ім'я та мову, і все.",copy:"Копіювати",copied:"Скопійовано",share:"Поділитися …",close:"Закрити",micOff:"Мікрофон вимкнено",micOffSub:"Натисніть, щоб говорити",micOn:"Слухаю …",micOnSub:"Говоріть звичайно, пауза завершує речення",micWait:"Озвучується переклад",micWaitSub:"Мікрофон на паузі, щоб не було відлуння",noSR:"Цей браузер не розпізнає мовлення. Використовуйте Chrome, Edge або Safari. Писати можна.",insecure:"Мікрофону потрібне захищене з'єднання (https). За цим посиланням можна лише писати.",denied:"Мікрофон заблоковано. Дозвольте доступ у налаштуваннях браузера.",roomGone:"Такої кімнати немає. Перевірте код.",nameMissing:"Будь ласка, введіть ім'я.",you:"ви",connecting:"Підключаюся до кімнати …",offline:"З'єднання втрачено, підключаюся …",inviteText:"Приєднуйся до моєї розмови з живим перекладом",replay:"Прослухати ще раз",trFail:"Переклад недоступний"}
+  de:{tagline:"Sprecht in eurer eigenen Sprache. Alle anderen hören und lesen sofort die Übersetzung.",yourName:"Dein Name",iSpeak:"Ich spreche",create:"Neuen Raum starten",or:"oder mit Code beitreten",code:"CODE",join:"Beitreten",invited:"Du wurdest eingeladen",room:"Raum",enter:"Gespräch beitreten",invite:"Einladen",empty:"Noch ist es still. Tippe auf das Mikrofon und sprich – oder lade zuerst jemanden ein.",readAloud:"Vorlesen",typeHere:"Oder hier tippen …",send:"Senden",inviteTitle:"Leute einladen",inviteHint:"QR-Code scannen oder Link schicken. Name und Sprache wählen, fertig.",copy:"Kopieren",copied:"Kopiert",share:"Teilen …",close:"Schließen",micOff:"Mikrofon aus",micOffSub:"Tippe zum Sprechen",micOn:"Ich höre zu …",micOnSub:"Sprich ganz normal, Pausen beenden einen Satz",micWait:"Übersetzung wird vorgelesen",micWaitSub:"Mikrofon pausiert, damit es kein Echo gibt",noSR:"Dieser Browser kann keine Sprache erkennen. Nutze Chrome, Edge oder Safari – tippen geht trotzdem.",insecure:"Das Mikrofon braucht eine sichere Verbindung (https). Über diesen Link kannst du nur tippen.",denied:"Mikrofon blockiert. Erlaube den Zugriff in den Browser-Einstellungen.",roomGone:"Diesen Raum gibt es nicht. Prüfe den Code.",nameMissing:"Bitte gib deinen Namen ein.",you:"du",connecting:"Verbinde mit dem Raum …",offline:"Verbindung unterbrochen, verbinde neu …",inviteText:"Komm in mein Gespräch mit Live-Übersetzung",replay:"Nochmal hören",trFail:"Übersetzung nicht verfügbar",voice:"Stimme",voiceTitle:"Vorlese-Stimme",voiceHint:"Gilt für {lang} auf diesem Gerät. Wähle die Stimme, die dir am klarsten klingt.",voiceLabel:"Stimme",pitchLabel:"Tonhöhe",voiceAuto:"Automatisch (Männerstimme bevorzugt)",voiceGoogle:"Google-Stimme (online)",pitch_auto:"Automatisch (Frauenstimmen tiefer)",pitch_normal:"Normal",pitch_low:"Tiefer",voiceTest:"▶ Probe hören",male:"Mann",female:"Frau",basic:"einfach",sample:"Guten Tag! Schön, dass du da bist. Wie war deine Reise?"},
+  en:{tagline:"Everyone speaks their own language. Everyone else hears and reads the translation right away.",yourName:"Your name",iSpeak:"I speak",create:"Start a new room",or:"or join with a code",code:"CODE",join:"Join",invited:"You're invited",room:"Room",enter:"Join the conversation",invite:"Invite",empty:"It's quiet so far. Tap the microphone and talk, or invite someone first.",readAloud:"Read aloud",typeHere:"Or type here …",send:"Send",inviteTitle:"Invite people",inviteHint:"Scan the QR code or send the link. Pick a name and language, done.",copy:"Copy",copied:"Copied",share:"Share …",close:"Close",micOff:"Microphone off",micOffSub:"Tap to speak",micOn:"Listening …",micOnSub:"Speak normally, a pause ends a sentence",micWait:"Reading translation aloud",micWaitSub:"Microphone paused to avoid echo",noSR:"This browser can't recognise speech. Use Chrome, Edge or Safari. Typing still works.",insecure:"The microphone needs a secure (https) connection. With this link you can only type.",denied:"Microphone blocked. Allow access in your browser settings.",roomGone:"That room doesn't exist. Check the code.",nameMissing:"Please enter your name.",you:"you",connecting:"Connecting to the room …",offline:"Connection lost, reconnecting …",inviteText:"Join my conversation with live translation",replay:"Play again",trFail:"Translation unavailable",voice:"Voice",voiceTitle:"Reading voice",voiceHint:"Applies to {lang} on this device. Pick the voice that sounds clearest to you.",voiceLabel:"Voice",pitchLabel:"Pitch",voiceAuto:"Automatic (prefers a male voice)",voiceGoogle:"Google voice (online)",pitch_auto:"Automatic (female voices lower)",pitch_normal:"Normal",pitch_low:"Lower",voiceTest:"▶ Play sample",male:"male",female:"female",basic:"basic",sample:"Hello! It is good to have you here. How was your journey?"},
+  uk:{tagline:"Кожен говорить своєю мовою. Інші одразу чують і читають переклад.",yourName:"Ваше ім'я",iSpeak:"Я розмовляю",create:"Створити нову кімнату",or:"або приєднатися за кодом",code:"КОД",join:"Увійти",invited:"Вас запросили",room:"Кімната",enter:"Приєднатися до розмови",invite:"Запросити",empty:"Поки що тихо. Натисніть мікрофон і говоріть або спершу запросіть когось.",readAloud:"Озвучувати",typeHere:"Або напишіть тут …",send:"Надіслати",inviteTitle:"Запросити людей",inviteHint:"Скануйте QR-код або надішліть посилання. Оберіть ім'я та мову, і все.",copy:"Копіювати",copied:"Скопійовано",share:"Поділитися …",close:"Закрити",micOff:"Мікрофон вимкнено",micOffSub:"Натисніть, щоб говорити",micOn:"Слухаю …",micOnSub:"Говоріть звичайно, пауза завершує речення",micWait:"Озвучується переклад",micWaitSub:"Мікрофон на паузі, щоб не було відлуння",noSR:"Цей браузер не розпізнає мовлення. Використовуйте Chrome, Edge або Safari. Писати можна.",insecure:"Мікрофону потрібне захищене з'єднання (https). За цим посиланням можна лише писати.",denied:"Мікрофон заблоковано. Дозвольте доступ у налаштуваннях браузера.",roomGone:"Такої кімнати немає. Перевірте код.",nameMissing:"Будь ласка, введіть ім'я.",you:"ви",connecting:"Підключаюся до кімнати …",offline:"З'єднання втрачено, підключаюся …",inviteText:"Приєднуйся до моєї розмови з живим перекладом",replay:"Прослухати ще раз",trFail:"Переклад недоступний",voice:"Голос",voiceTitle:"Голос озвучування",voiceHint:"Діє для мови «{lang}» на цьому пристрої. Оберіть голос, який звучить найчіткіше.",voiceLabel:"Голос",pitchLabel:"Висота голосу",voiceAuto:"Автоматично (перевага чоловічому голосу)",voiceGoogle:"Голос Google (онлайн)",pitch_auto:"Автоматично (жіночі голоси нижче)",pitch_normal:"Звичайна",pitch_low:"Нижча",voiceTest:"▶ Прослухати",male:"чоловічий",female:"жіночий",basic:"простий",sample:"Добрий день! Радий вас бачити. Як пройшла ваша подорож?"}
 };
 const LANGS = [["de","Deutsch","DE"],["en","English","EN"],["uk","Українська","UK"]];
 const LOCALE = {de:"de-DE",en:"en-US",uk:"uk-UA"};
@@ -494,17 +513,33 @@ const audio=new Audio(); let ttsQueue=[], playing=false;
 function unlockAudio(){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")) }catch(e){} audio.muted=true; audio.play().catch(()=>{}).finally(()=>{audio.muted=false}) }
 /* Nur Standardsprache: de-DE, uk-UA, en-US/en-GB. Keine Dialekt- oder Spaßstimmen; sonst Google-Stimme (ebenfalls Standard). */
 const STD_LOCALES={de:["de-DE"],en:["en-US","en-GB"],uk:["uk-UA"]};
-const NOVELTY=/(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa|flo|rocko|sandy|shelley)/i;
+const NOVELTY=/\b(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa|flo|rocko|sandy|shelley)\b/i;
 /* Männerstimmen bevorzugt (Apple, Microsoft, Google). Die Web-Sprachausgabe kennt kein Geschlecht, daher nach Namen. */
 const MALE=/\b(markus|yannick|martin|stefan|conrad|killian|florian|jonas|bernd|daniel|arthur|oliver|malcolm|alex|aaron|tom|evan|nathan|david|guy|christopher|eric|roger|steffan|andrew|brian|george|ryan|thomas|ostap|male)\b/i;
 const MALE_BASIC=/\b(reed|eddy)\b/i;   // einfache, etwas technisch klingende Männerstimmen auf Apple-Geräten
 const isMale=v=>MALE.test(v.name)||MALE_BASIC.test(v.name);
 const MALE_PITCH=0.6;   // Frauenstimme tiefer stellen, wenn keine Männerstimme installiert ist (z. B. Ukrainisch auf Apple-Geräten)
-function voiceFor(l){
+const FEMALE=/\b(anna|petra|helena|katja|amala|seraphina|vicki|samantha|karen|moira|tessa|serena|kate|stephanie|martha|ava|allison|susan|victoria|zoe|lesya|polina|zira|aria|jenny|libby|sonia|maisie|hedda|female)\b/i;
+const voicePref=l=>store.get("tl_voice_"+l)||"auto";
+const pitchPref=l=>store.get("tl_pitch_"+l)||"auto";
+function stdVoices(l){
   const vs=window.speechSynthesis?speechSynthesis.getVoices():[];
-  const ok=vs.filter(v=>STD_LOCALES[l].includes(v.lang.replace("_","-")) && !NOVELTY.test(v.name));
-  const score=v=>(MALE.test(v.name)?20:MALE_BASIC.test(v.name)?10:0)+(/premium|enhanced|natural|neural|online/i.test(v.name)?4:0)+(/google/i.test(v.name)?3:0)+(v.lang.replace("_","-")===STD_LOCALES[l][0]?2:0)+(v.localService?0:1);
+  return vs.filter(v=>STD_LOCALES[l].includes(v.lang.replace("_","-")) && !NOVELTY.test(v.name));
+}
+function voiceFor(l){
+  const pref=voicePref(l);
+  if(pref==="google") return null;
+  const ok=stdVoices(l);
+  if(pref!=="auto"){ const chosen=ok.find(v=>v.voiceURI===pref); if(chosen) return chosen }
+  // Automatisch: gute Männerstimme > gute Stimme (wird tiefer gestellt) > einfache Apple-Stimmen
+  const score=v=>(MALE.test(v.name)?20:MALE_BASIC.test(v.name)?-10:0)+(/premium|enhanced|natural|neural|online/i.test(v.name)?4:0)+(/google/i.test(v.name)?3:0)+(v.lang.replace("_","-")===STD_LOCALES[l][0]?2:0)+(v.localService?0:1);
   return ok.sort((a,b)=>score(b)-score(a))[0];
+}
+function pitchFor(l,v){
+  const p=pitchPref(l);
+  if(p==="normal") return 1;
+  if(p==="low") return MALE_PITCH;
+  return (v&&isMale(v)) ? 1 : MALE_PITCH;
 }
 function speakMsg(m,force){
   if(!force && !$("speakToggle").checked) return;
@@ -520,10 +555,10 @@ async function playNext(){
   const v=voiceFor(item.lang);
   try{
     if(v){
-      await new Promise(res=>{ const u=new SpeechSynthesisUtterance(item.text); u.voice=v; u.lang=v.lang; u.rate=1.05; if(!isMale(v)) u.pitch=MALE_PITCH; u.onend=res; u.onerror=res; speechSynthesis.speak(u) });
+      await new Promise(res=>{ const u=new SpeechSynthesisUtterance(item.text); u.voice=v; u.lang=v.lang; u.rate=1.05; u.pitch=pitchFor(item.lang,v); u.onend=res; u.onerror=res; speechSynthesis.speak(u) });
     } else {
       for(const c of chunks(item.text)){
-        await new Promise(res=>{ audio.src="https://translate.google.com/translate_tts?"+new URLSearchParams({ie:"UTF-8",tl:item.lang,client:"tw-ob",q:c}); audio.preservesPitch=false; audio.playbackRate=0.84; audio.onended=res; audio.onerror=res; audio.play().catch(res) });
+        await new Promise(res=>{ audio.src="https://translate.google.com/translate_tts?"+new URLSearchParams({ie:"UTF-8",tl:item.lang,client:"tw-ob",q:c}); const low=pitchFor(item.lang,null)!==1; audio.preservesPitch=!low; audio.playbackRate=low?0.84:1; audio.onended=res; audio.onerror=res; audio.play().catch(res) });
       }
     }
   }catch(e){}
@@ -549,7 +584,34 @@ function openSheet(){
 $("inviteBtn").onclick=openSheet;
 $("closeSheet").onclick=()=>$("sheet").hidden=true;
 $("sheet").onclick=e=>{ if(e.target.id==="sheet") $("sheet").hidden=true };
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("sheet").hidden=true });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ $("sheet").hidden=true; $("voiceSheet").hidden=true } });
+
+/* ---------- Vorlese-Stimme wählen ---------- */
+function regionName(code){ try{ return new Intl.DisplayNames([LOCALE[lang]],{type:"region"}).of(code) }catch(e){ return code } }
+function voiceLabel(v){
+  const region=regionName(v.lang.replace("_","-").split("-")[1]||"");
+  const g=isMale(v) ? t("male")+(MALE_BASIC.test(v.name)?", "+t("basic"):"") : (FEMALE.test(v.name)?t("female"):"");
+  return v.name.replace(/\s*\(.*\)\s*$/,"")+" · "+region+(g?" · "+g:"");
+}
+function fillVoiceSheet(){
+  const sel=$("voiceSelect"); sel.innerHTML="";
+  sel.add(new Option(t("voiceAuto"),"auto"));
+  const list=stdVoices(lang).sort((a,b)=>(isMale(b)-isMale(a))||(MALE_BASIC.test(a.name)-MALE_BASIC.test(b.name))||a.name.localeCompare(b.name));
+  for(const v of list) sel.add(new Option(voiceLabel(v),v.voiceURI));
+  sel.add(new Option(t("voiceGoogle"),"google"));
+  sel.value=voicePref(lang); if(sel.selectedIndex<0) sel.value="auto";
+  const ps=$("pitchSelect"); ps.innerHTML="";
+  for(const k of ["auto","normal","low"]) ps.add(new Option(t("pitch_"+k),k));
+  ps.value=pitchPref(lang);
+  $("voiceHint").textContent=t("voiceHint").replace("{lang}",LANGS.find(x=>x[0]===lang)[1]);
+}
+$("voiceBtn").onclick=()=>{ fillVoiceSheet(); $("voiceSheet").hidden=false };
+if(window.speechSynthesis) speechSynthesis.addEventListener("voiceschanged",()=>{ if(!$("voiceSheet").hidden) fillVoiceSheet() });
+$("voiceSelect").onchange=e=>store.set("tl_voice_"+lang,e.target.value);
+$("pitchSelect").onchange=e=>store.set("tl_pitch_"+lang,e.target.value);
+$("voiceTest").onclick=()=>{ unlockAudio(); ttsQueue=[]; try{ speechSynthesis.cancel() }catch(e){} if(!audio.paused){ audio.pause(); audio.onended&&audio.onended() } ttsQueue.push({text:t("sample"),lang}); if(!playing) playNext() };
+$("voiceDone").onclick=()=>$("voiceSheet").hidden=true;
+$("voiceSheet").onclick=e=>{ if(e.target.id==="voiceSheet") $("voiceSheet").hidden=true };
 $("copyBtn").onclick=async()=>{
   try{ await navigator.clipboard.writeText(inviteUrl()); $("copyBtn").textContent=t("copied") }
   catch(e){ const r=document.createRange(); r.selectNodeContents($("inviteLink")); const s=getSelection(); s.removeAllRanges(); s.addRange(r) }

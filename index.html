@@ -408,7 +408,7 @@ const audio=new Audio(); let ttsQueue=[], playing=false;
 function unlockAudio(){ try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")) }catch(e){} audio.muted=true; audio.play().catch(()=>{}).finally(()=>{audio.muted=false}) }
 /* Nur Standardsprache: de-DE, uk-UA, en-US/en-GB. Keine Dialekt- oder Spaßstimmen; sonst Google-Stimme (ebenfalls Standard). */
 const STD_LOCALES={de:["de-DE"],en:["en-US","en-GB"],uk:["uk-UA"]};
-const NOVELTY=/(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa|flo|rocko|sandy|shelley)/i;
+const NOVELTY=/\b(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa|flo|rocko|sandy|shelley)\b/i;
 /* Männerstimmen bevorzugt (Apple, Microsoft, Google). Die Web-Sprachausgabe kennt kein Geschlecht, daher nach Namen. */
 const MALE=/\b(markus|yannick|martin|stefan|conrad|killian|florian|jonas|bernd|daniel|arthur|oliver|malcolm|alex|aaron|tom|evan|nathan|david|guy|christopher|eric|roger|steffan|andrew|brian|george|ryan|thomas|ostap|male)\b/i;
 const MALE_BASIC=/\b(reed|eddy)\b/i;   // einfache, etwas technisch klingende Männerstimmen auf Apple-Geräten
