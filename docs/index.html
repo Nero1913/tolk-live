@@ -498,6 +498,8 @@ const NOVELTY=/(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jeste
 /* Männerstimmen bevorzugt (Apple, Microsoft, Google). Die Web-Sprachausgabe kennt kein Geschlecht, daher nach Namen. */
 const MALE=/\b(markus|yannick|martin|stefan|conrad|killian|florian|jonas|bernd|daniel|arthur|oliver|malcolm|alex|aaron|tom|evan|nathan|david|guy|christopher|eric|roger|steffan|andrew|brian|george|ryan|thomas|ostap|male)\b/i;
 const MALE_BASIC=/\b(reed|eddy)\b/i;   // einfache, etwas technisch klingende Männerstimmen auf Apple-Geräten
+const isMale=v=>MALE.test(v.name)||MALE_BASIC.test(v.name);
+const MALE_PITCH=0.6;   // Frauenstimme tiefer stellen, wenn keine Männerstimme installiert ist (z. B. Ukrainisch auf Apple-Geräten)
 function voiceFor(l){
   const vs=window.speechSynthesis?speechSynthesis.getVoices():[];
   const ok=vs.filter(v=>STD_LOCALES[l].includes(v.lang.replace("_","-")) && !NOVELTY.test(v.name));
@@ -518,10 +520,10 @@ async function playNext(){
   const v=voiceFor(item.lang);
   try{
     if(v){
-      await new Promise(res=>{ const u=new SpeechSynthesisUtterance(item.text); u.voice=v; u.lang=v.lang; u.rate=1.05; u.onend=res; u.onerror=res; speechSynthesis.speak(u) });
+      await new Promise(res=>{ const u=new SpeechSynthesisUtterance(item.text); u.voice=v; u.lang=v.lang; u.rate=1.05; if(!isMale(v)) u.pitch=MALE_PITCH; u.onend=res; u.onerror=res; speechSynthesis.speak(u) });
     } else {
       for(const c of chunks(item.text)){
-        await new Promise(res=>{ audio.src="https://translate.google.com/translate_tts?"+new URLSearchParams({ie:"UTF-8",tl:item.lang,client:"tw-ob",q:c}); audio.onended=res; audio.onerror=res; audio.play().catch(res) });
+        await new Promise(res=>{ audio.src="https://translate.google.com/translate_tts?"+new URLSearchParams({ie:"UTF-8",tl:item.lang,client:"tw-ob",q:c}); audio.preservesPitch=false; audio.playbackRate=0.84; audio.onended=res; audio.onerror=res; audio.play().catch(res) });
       }
     }
   }catch(e){}
